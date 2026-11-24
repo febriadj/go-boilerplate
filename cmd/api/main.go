@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"medpath-server/internal/feature/health"
+	"medpath-server/internal/platform/apidocs"
 	"medpath-server/internal/platform/config"
 	"medpath-server/internal/platform/httpserver"
 )
@@ -17,6 +18,11 @@ import (
 // Set at build time: go build -ldflags "-X main.version=1.2.3".
 var version = "dev"
 
+// @title			Medpath API
+// @version		0.1.0
+// @description	Clinical pathway service that runs alongside SIMRS.
+// @BasePath		/
+// @schemes		http https
 func main() {
 	if err := run(); err != nil {
 		slog.Error("server stopped", slog.Any("error", err))
@@ -35,6 +41,9 @@ func run() error {
 
 	router := httpserver.NewRouter(cfg, logger)
 	health.Register(router, version)
+	if cfg.APIDocsEnabled {
+		apidocs.Register(router, version)
+	}
 
 	srv := httpserver.NewServer(cfg.HTTPAddr, router)
 

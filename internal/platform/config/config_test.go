@@ -8,7 +8,7 @@ import (
 )
 
 func TestLoadDefaults(t *testing.T) {
-	for _, key := range []string{"APP_ENV", "HTTP_ADDR", "CORS_ALLOWED_ORIGINS", "LOG_LEVEL", "SHUTDOWN_TIMEOUT"} {
+	for _, key := range []string{"APP_ENV", "HTTP_ADDR", "CORS_ALLOWED_ORIGINS", "LOG_LEVEL", "SHUTDOWN_TIMEOUT", "API_DOCS_ENABLED"} {
 		t.Setenv(key, "")
 	}
 
@@ -56,5 +56,31 @@ func TestLoadReportsAllErrors(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %s", err, want)
 		}
+	}
+}
+
+func TestAPIDocsDefaultsByEnvironment(t *testing.T) {
+	cases := []struct {
+		env, flag string
+		want      bool
+	}{
+		{"development", "", true},
+		{"staging", "", true},
+		{"production", "", false},
+		{"production", "true", true},
+		{"development", "false", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.env+"/"+tc.flag, func(t *testing.T) {
+			t.Setenv("APP_ENV", tc.env)
+			t.Setenv("API_DOCS_ENABLED", tc.flag)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.APIDocsEnabled != tc.want {
+				t.Fatalf("APIDocsEnabled = %v, want %v", cfg.APIDocsEnabled, tc.want)
+			}
+		})
 	}
 }

@@ -1,0 +1,59 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Clinical pathway service that runs alongside SIMRS.",
+        "title": "Medpath API",
+        "contact": {},
+        "version": "0.1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/healthz": {
+            "get": {
+                "description": "Reports that the process is up. It does not check the database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/health.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "health.Response": {
+            "type": "object",
+            "properties": {
+                "service": {
+                    "type": "string",
+                    "example": "medpath-server"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "time": {
+                    "type": "string",
+                    "example": "2026-11-24T08:00:00Z"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "0.1.0"
+                }
+            }
+        }
+    }
+}

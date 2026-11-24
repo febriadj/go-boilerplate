@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,8 @@ type Config struct {
 	AllowedOrigins  []string
 	LogLevel        slog.Level
 	ShutdownTimeout time.Duration
+	// APIDocsEnabled serves Swagger UI and Scalar. Off by default in production.
+	APIDocsEnabled bool
 }
 
 // Load reads configuration from environment variables and reports every invalid value at once.
@@ -52,6 +55,16 @@ func Load() (Config, error) {
 			errs = append(errs, fmt.Errorf("SHUTDOWN_TIMEOUT must be a positive duration such as 10s, got %q", raw))
 		} else {
 			cfg.ShutdownTimeout = d
+		}
+	}
+
+	cfg.APIDocsEnabled = cfg.Env != Production
+	if raw := os.Getenv("API_DOCS_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("API_DOCS_ENABLED must be true or false, got %q", raw))
+		} else {
+			cfg.APIDocsEnabled = enabled
 		}
 	}
 
