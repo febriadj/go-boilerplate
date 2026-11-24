@@ -2,23 +2,22 @@ package health_test
 
 import (
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
-
 	"medpath-server/internal/feature/health"
 	"medpath-server/internal/platform/config"
 	"medpath-server/internal/platform/httpserver"
+
+	"github.com/gin-gonic/gin"
 )
 
 func newRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	cfg := config.Config{AllowedOrigins: []string{"http://localhost:3000"}}
-	router := httpserver.NewRouter(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	router := httpserver.NewRouter(cfg, slog.New(slog.DiscardHandler))
 	health.Register(router, "test")
 	return router
 }

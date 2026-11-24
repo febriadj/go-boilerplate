@@ -1,0 +1,39 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - sloglint
+  settings:
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    sloglint:
+      # Typed attributes (slog.String, slog.Int) only, matching the access log.
+      attr-only: true
+      no-global: default
+  exclusions:
+    generated: strict
+    rules:
+      # Tests build requests and set env vars freely; the production checks are not about them.
+      - path: _test\.go
+        linters: [gosec, noctx, bodyclose]
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    # The module path has no dot, so gofumpt must be told it is not part of the standard library.
+    gofumpt:
+      module-path: medpath-server
+    goimports:
+      local-prefixes: [medpath-server]
+  exclusions:
+    generated: strict

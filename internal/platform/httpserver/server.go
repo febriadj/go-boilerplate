@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	"medpath-server/internal/platform/config"
+
+	"github.com/gin-gonic/gin"
 )
 
 // NewRouter builds the Gin engine with the middleware every feature shares.

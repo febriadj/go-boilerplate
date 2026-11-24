@@ -25,7 +25,8 @@ var version = "dev"
 // @schemes		http https
 func main() {
 	if err := run(); err != nil {
-		slog.Error("server stopped", slog.Any("error", err))
+		// Config may have failed before the app logger exists, so log to stderr directly.
+		slog.New(slog.NewTextHandler(os.Stderr, nil)).Error("server stopped", slog.Any("error", err))
 		os.Exit(1)
 	}
 }

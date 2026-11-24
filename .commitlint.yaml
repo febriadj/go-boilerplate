@@ -1,0 +1,55 @@
+# Mirrors @commitlint/config-conventional used by medpath-client, so both repos accept the same messages.
+# Not ported: config-conventional's subject-case. This tool can only require one case, which would
+# reject descriptions such as "add closeOnClick attribute" that medpath-client allows.
+# Stricter than the client: the parser rejects a body that does not follow a blank line.
+min-version: v0.12.0
+formatter: default
+rules:
+  - type-enum
+  - type-case
+  - type-empty
+  - description-empty
+  - description-full-stop
+  - header-max-length
+  - header-trim
+  - body-leading-blank
+  - body-max-line-length
+  - footer-leading-blank
+  - footer-max-line-length
+severity:
+  default: error
+  rules:
+    body-leading-blank: warn
+    footer-leading-blank: warn
+settings:
+  # Rules without an argument still need an entry here.
+  type-empty: {}
+  description-empty: {}
+  header-trim: {}
+  body-leading-blank: {}
+  footer-leading-blank: {}
+  type-enum:
+    argument:
+      - build
+      - chore
+      - ci
+      - docs
+      - feat
+      - fix
+      - perf
+      - refactor
+      - revert
+      - style
+      - test
+  type-case:
+    argument: lower-case
+  description-full-stop:
+    argument: "."
+  header-max-length:
+    argument: 100
+  body-max-line-length:
+    argument: 100
+  footer-max-line-length:
+    argument: 100
+disable-default-ignores: false
+ignores: []

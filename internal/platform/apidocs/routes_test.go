@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
-
 	"medpath-server/internal/platform/apidocs"
+
+	"github.com/gin-gonic/gin"
 )
 
 func newRouter() *gin.Engine {
