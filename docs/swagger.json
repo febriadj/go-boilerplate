@@ -31,9 +31,56 @@
                     }
                 }
             }
+        },
+        "/readyz": {
+            "get": {
+                "description": "Reports whether the server can take traffic, which requires a reachable database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/health.ReadinessResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/health.ReadinessResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "health.ReadinessResponse": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "unavailable"
+                    ],
+                    "example": "ok"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "unavailable"
+                    ],
+                    "example": "ok"
+                }
+            }
+        },
         "health.Response": {
             "type": "object",
             "properties": {

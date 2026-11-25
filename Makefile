@@ -12,7 +12,7 @@ include .env
 export
 endif
 
-.PHONY: run build test vet tidy docs tools hooks lint fmt
+.PHONY: run build test vet tidy docs tools hooks lint fmt docker-dev docker-build
 
 run:
 	go run -ldflags "$(LDFLAGS)" ./cmd/api
@@ -50,3 +50,11 @@ lint:
 
 fmt:
 	$(BIN)/golangci-lint fmt ./...
+
+# Development stack: API with live reload plus Postgres.
+docker-dev:
+	docker compose up --build
+
+# Production image, tagged with the git version.
+docker-build:
+	docker build --target prod --build-arg VERSION=$(VERSION) -t medpath-server:$(VERSION) .

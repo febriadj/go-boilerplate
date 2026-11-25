@@ -26,15 +26,24 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	// APIDocsEnabled serves Swagger UI and Scalar. Off by default in production.
 	APIDocsEnabled bool
+	Database       Database
+}
+
+type Database struct {
+	// URL holds the password, so it must never be logged.
+	URL             string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 // Load reads configuration from environment variables and reports every invalid value at once.
 func Load() (Config, error) {
 	cfg := Config{
-		Env:             Environment(get("APP_ENV", string(Development))),
-		HTTPAddr:        get("HTTP_ADDR", ":8080"),
-		AllowedOrigins:  splitList(get("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
-		ShutdownTimeout: 10 * time.Second,
+		Env:            Environment(get("APP_ENV", string(Development))),
+		HTTPAddr:       get("HTTP_ADDR", ":8080"),
+		AllowedOrigins: splitList(get("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 	}
 
 	var errs []error
@@ -49,14 +58,7 @@ func Load() (Config, error) {
 		errs = append(errs, fmt.Errorf("LOG_LEVEL: %w", err))
 	}
 
-	if raw := os.Getenv("SHUTDOWN_TIMEOUT"); raw != "" {
-		d, err := time.ParseDuration(raw)
-		if err != nil || d <= 0 {
-			errs = append(errs, fmt.Errorf("SHUTDOWN_TIMEOUT must be a positive duration such as 10s, got %q", raw))
-		} else {
-			cfg.ShutdownTimeout = d
-		}
-	}
+	cfg.ShutdownTimeout = positiveDuration("SHUTDOWN_TIMEOUT", 10*time.Second, &errs)
 
 	cfg.APIDocsEnabled = cfg.Env != Production
 	if raw := os.Getenv("API_DOCS_ENABLED"); raw != "" {
@@ -66,6 +68,23 @@ func Load() (Config, error) {
 		} else {
 			cfg.APIDocsEnabled = enabled
 		}
+	}
+
+	cfg.Database = Database{
+		URL:             strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		MaxOpenConns:    positiveInt("DB_MAX_OPEN_CONNS", 20, &errs),
+		MaxIdleConns:    positiveInt("DB_MAX_IDLE_CONNS", 5, &errs),
+		ConnMaxLifetime: positiveDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute, &errs),
+		ConnMaxIdleTime: positiveDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute, &errs),
+	}
+	switch {
+	case cfg.Database.URL == "":
+		errs = append(errs, errors.New("DATABASE_URL is required, for example postgres://user:pass@localhost:5432/medpath"))
+	case !strings.HasPrefix(cfg.Database.URL, "postgres://") && !strings.HasPrefix(cfg.Database.URL, "postgresql://"):
+		errs = append(errs, errors.New("DATABASE_URL must start with postgres:// or postgresql://"))
+	}
+	if cfg.Database.MaxIdleConns > cfg.Database.MaxOpenConns {
+		errs = append(errs, errors.New("DB_MAX_IDLE_CONNS cannot be larger than DB_MAX_OPEN_CONNS"))
 	}
 
 	if cfg.Env == Production && len(cfg.AllowedOrigins) == 0 {
@@ -92,4 +111,30 @@ func splitList(raw string) []string {
 		}
 	}
 	return out
+}
+
+func positiveInt(key string, fallback int, errs *[]error) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a positive whole number, got %q", key, raw))
+		return fallback
+	}
+	return n
+}
+
+func positiveDuration(key string, fallback time.Duration, errs *[]error) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		*errs = append(*errs, fmt.Errorf("%s must be a positive duration such as 10s, got %q", key, raw))
+		return fallback
+	}
+	return d
 }

@@ -3,15 +3,20 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"medpath-server/internal/feature/health"
 	"medpath-server/internal/platform/apidocs"
 	"medpath-server/internal/platform/config"
+	"medpath-server/internal/platform/database"
 	"medpath-server/internal/platform/httpserver"
 )
 
@@ -24,6 +29,9 @@ var version = "dev"
 // @BasePath		/
 // @schemes		http https
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
 	if err := run(); err != nil {
 		// Config may have failed before the app logger exists, so log to stderr directly.
 		slog.New(slog.NewTextHandler(os.Stderr, nil)).Error("server stopped", slog.Any("error", err))
@@ -40,16 +48,30 @@ func run() error {
 	logger := newLogger(cfg)
 	slog.SetDefault(logger)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	db, err := database.Open(ctx, cfg.Database, logger, cfg.LogLevel <= slog.LevelDebug)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := database.Close(db); err != nil {
+			logger.Error("close database", slog.Any("error", err))
+		}
+	}()
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
 	router := httpserver.NewRouter(cfg, logger)
-	health.Register(router, version)
+	health.Register(router, version, sqlDB, logger)
 	if cfg.APIDocsEnabled {
 		apidocs.Register(router, version)
 	}
 
 	srv := httpserver.NewServer(cfg.HTTPAddr, router)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -78,4 +100,39 @@ func newLogger(cfg config.Config) *slog.Logger {
 		return slog.New(slog.NewTextHandler(os.Stdout, opts))
 	}
 	return slog.New(slog.NewJSONHandler(os.Stdout, opts))
+}
+
+// healthcheck asks the running server for /readyz. The production image has no shell or curl,
+// so the container healthcheck runs the binary itself: medpath-server healthcheck.
+// Only the port comes from HTTP_ADDR; the host is always loopback, so it cannot be pointed elsewhere.
+func healthcheck() int {
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	_, rawPort, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 1
+	}
+	port, err := strconv.Atoi(rawPort)
+	if err != nil || port < 1 || port > 65535 {
+		return 1
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	url := fmt.Sprintf("http://127.0.0.1:%d/readyz", port)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:gosec // G704: host is fixed to 127.0.0.1, only a validated port comes from env
+	if err != nil {
+		return 1
+	}
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: same loopback-only URL as above
+	if err != nil {
+		return 1
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }

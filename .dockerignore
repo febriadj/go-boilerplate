@@ -1,0 +1,13 @@
+# Secrets and local state never enter the build context.
+.env
+.env.*
+!.env.example
+
+.git
+.claude
+.vscode
+bin
+tmp
+compose*.yaml
+Dockerfile
+.dockerignore

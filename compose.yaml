@@ -1,0 +1,45 @@
+# Development: docker compose up --build
+# The API reloads on every save. Postgres is also reachable from the host on 127.0.0.1:5432,
+# so `make run` on the host works against the same database.
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: development
+      HTTP_ADDR: :8080
+      DATABASE_URL: postgres://medpath:medpath@postgres:5432/medpath?sslmode=disable
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: medpath
+      POSTGRES_PASSWORD: medpath
+      POSTGRES_DB: medpath
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medpath -d medpath"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  go-mod-cache:
+  go-build-cache:
