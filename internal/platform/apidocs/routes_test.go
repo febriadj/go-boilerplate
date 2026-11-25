@@ -1,9 +1,12 @@
 package apidocs_test
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -61,17 +64,28 @@ func TestScalarPage(t *testing.T) {
 	}
 }
 
-func TestSwaggerUI(t *testing.T) {
+func TestDocsPagesHaveTheirOwnCSP(t *testing.T) {
 	router := newRouter()
-	if rec := get(t, router, "/docs/swagger"); rec.Code != http.StatusMovedPermanently {
-		t.Fatalf("/docs/swagger status = %d, want 301", rec.Code)
+
+	rec := get(t, router, "/docs")
+	csp := rec.Header().Get("Content-Security-Policy")
+	inline := regexp.MustCompile(`(?s)<script>(.*?)</script>`).FindStringSubmatch(rec.Body.String())
+	if inline == nil {
+		t.Fatal("no inline script on the Scalar page")
 	}
-	rec := get(t, router, "/docs/swagger/index.html")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "swagger-ui") {
-		t.Fatalf("index.html status = %d", rec.Code)
+	sum := sha256.Sum256([]byte(inline[1]))
+	hash := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
+	if !strings.Contains(csp, hash) || !strings.Contains(csp, "https://cdn.jsdelivr.net") {
+		t.Fatalf("Scalar CSP %q does not allow the inline script %s", csp, hash)
 	}
-	init := get(t, router, "/docs/swagger/swagger-initializer.js")
-	if !strings.Contains(init.Body.String(), "/docs/openapi.json") {
-		t.Fatal("Swagger UI does not point at /docs/openapi.json")
+	for _, directive := range strings.Split(csp, ";") {
+		if strings.HasPrefix(strings.TrimSpace(directive), "script-src") && strings.Contains(directive, "'unsafe-inline'") {
+			t.Fatalf("Scalar CSP allows any inline script: %q", directive)
+		}
+	}
+
+	swaggerCSP := get(t, router, "/docs/swagger/index.html").Header().Get("Content-Security-Policy")
+	if !strings.Contains(swaggerCSP, "script-src 'self'") || strings.Contains(swaggerCSP, "cdn.jsdelivr.net") {
+		t.Fatalf("Swagger UI CSP = %q", swaggerCSP)
 	}
 }

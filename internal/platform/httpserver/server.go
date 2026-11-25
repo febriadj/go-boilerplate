@@ -27,6 +27,7 @@ func NewRouter(cfg config.Config, logger *slog.Logger) *gin.Engine {
 			)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		}),
+		SecurityHeaders(SecurityOptions{HSTS: cfg.Env != config.Development}),
 		RequestID(),
 		AccessLog(logger),
 		CORS(cfg.AllowedOrigins),
