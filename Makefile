@@ -12,7 +12,8 @@ include .env
 export
 endif
 
-.PHONY: run build test vet tidy docs tools hooks lint fmt docker-dev docker-build
+.PHONY: run build test vet tidy docs tools hooks lint fmt docker-dev docker-build \
+	docker-prod docker-prod-down docker-prod-logs docker-prod-ps prod-env
 
 run:
 	go run -ldflags "$(LDFLAGS)" ./cmd/api
@@ -51,6 +52,12 @@ lint:
 fmt:
 	$(BIN)/golangci-lint fmt ./...
 
+PROD_ENV_FILE ?= .env.production
+# env -i keeps the variables exported from .env above out of production: compose prefers
+# the shell environment over --env-file, so a dev CORS origin would otherwise win.
+PROD_COMPOSE = env -i PATH="$$PATH" HOME="$$HOME" $(if $(DOCKER_HOST),DOCKER_HOST="$(DOCKER_HOST)") \
+	VERSION=$(VERSION) docker compose -f compose.prod.yaml --env-file $(PROD_ENV_FILE)
+
 # Development stack: API with live reload plus Postgres.
 docker-dev:
 	docker compose up --build
@@ -58,3 +65,19 @@ docker-dev:
 # Production image, tagged with the git version.
 docker-build:
 	docker build --target prod --build-arg VERSION=$(VERSION) -t medpath-server:$(VERSION) .
+
+prod-env:
+	@test -f $(PROD_ENV_FILE) || { echo "$(PROD_ENV_FILE) not found; copy .env.example and set POSTGRES_PASSWORD and CORS_ALLOWED_ORIGINS" >&2; exit 1; }
+
+# Production stack: build the image for this version and start it in the background.
+docker-prod: prod-env
+	$(PROD_COMPOSE) up -d --build
+
+docker-prod-down: prod-env
+	$(PROD_COMPOSE) down
+
+docker-prod-logs: prod-env
+	$(PROD_COMPOSE) logs -f api
+
+docker-prod-ps: prod-env
+	$(PROD_COMPOSE) ps
